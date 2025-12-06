@@ -22,6 +22,15 @@ config :ride_fast_api, RideFastApiWeb.Endpoint,
   pubsub_server: RideFastApi.PubSub,
   live_view: [signing_salt: "l/ArBiMh"]
 
+  config :guardian, RideFastApi.Guardian,
+  # Módulo que lida com a serialização e desserialização das entidades
+  serializer: RideFastApi.Guardian,
+  # O nome que aparecerá no campo 'iss' (issuer) do token
+  issuer: "RideFastAPI",
+  # Algoritmo de criptografia (HS512 é uma boa escolha simétrica)
+  ttl: {30, :days}, # Tempo de vida do token: 30 dias (ajuste conforme a necessidade)
+  secret: System.get_env("GUARDIAN_SECRET") # Usa variável de ambiente por segurança
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails

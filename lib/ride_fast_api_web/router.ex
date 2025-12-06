@@ -20,6 +20,21 @@ defmodule RideFastApiWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/api/v1", RideFastApiWeb do
+  pipe_through :api # Todas as rotas dentro deste scope usarão o pipeline :api
+
+  # Escopo específico para autenticação
+  scope "/auth" do
+    # 1. Registro (Endpoint que fizemos na última interação)
+    post "/register", AuthController, :register
+
+    # 2. Login (POST /api/v1/auth/login)
+    post "/login", AuthController, :login
+  end
+
+  # Mais tarde, você colocará rotas protegidas como /users e /rides aqui
+end
+
   # Other scopes may use custom stacks.
   # scope "/api", RideFastApiWeb do
   #   pipe_through :api
