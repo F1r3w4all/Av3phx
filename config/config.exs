@@ -1,17 +1,11 @@
-# This file is responsible for configuring your application
-# and its dependencies with the aid of the Config module.
-#
-# This configuration file is loaded before any dependency and
-# is restricted to this project.
-
-# General application configuration
 import Config
 
+# Configuração geral
 config :ride_fast_api,
   ecto_repos: [RideFastApi.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-# Configures the endpoint
+# Endpoint
 config :ride_fast_api, RideFastApiWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
@@ -22,25 +16,15 @@ config :ride_fast_api, RideFastApiWeb.Endpoint,
   pubsub_server: RideFastApi.PubSub,
   live_view: [signing_salt: "l/ArBiMh"]
 
-  config :guardian, RideFastApi.Guardian,
-  # Módulo que lida com a serialização e desserialização das entidades
-  serializer: RideFastApi.Guardian,
-  # O nome que aparecerá no campo 'iss' (issuer) do token
-  issuer: "RideFastAPI",
-  # Algoritmo de criptografia (HS512 é uma boa escolha simétrica)
-  ttl: {30, :days}, # Tempo de vida do token: 30 dias (ajuste conforme a necessidade)
-  secret: System.get_env("GUARDIAN_SECRET") # Usa variável de ambiente por segurança
+# Guardian – DEV (pode ajustar depois para usar variável de ambiente)
+config :ride_fast_api, RideFastApi.Guardian,
+  issuer: "ride_fast_api",
+  secret_key: System.get_env("GUARDIAN_SECRET") || "DEV_SECRET_CHANGE_ME"
 
-# Configures the mailer
-#
-# By default it uses the "Local" adapter which stores the emails
-# locally. You can see the emails in your browser, at "/dev/mailbox".
-#
-# For production it's recommended to configure a different adapter
-# at the `config/runtime.exs`.
+# Mailer
 config :ride_fast_api, RideFastApi.Mailer, adapter: Swoosh.Adapters.Local
 
-# Configure esbuild (the version is required)
+# Esbuild
 config :esbuild,
   version: "0.25.4",
   ride_fast_api: [
@@ -50,7 +34,7 @@ config :esbuild,
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
-# Configure tailwind (the version is required)
+# Tailwind
 config :tailwind,
   version: "4.1.7",
   ride_fast_api: [
@@ -61,14 +45,13 @@ config :tailwind,
     cd: Path.expand("..", __DIR__)
   ]
 
-# Configures Elixir's Logger
+# Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
-# Use Jason for JSON parsing in Phoenix
+# JSON
 config :phoenix, :json_library, Jason
 
-# Import environment specific config. This must remain at the bottom
-# of this file so it overrides the configuration defined above.
+# Importa configs específicas de ambiente (dev.exs, prod.exs etc.)
 import_config "#{config_env()}.exs"

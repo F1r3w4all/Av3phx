@@ -40,16 +40,15 @@ defmodule RideFastApi.Accounts.Driver do
 
   # Função auxiliar para hashear a senha
   defp put_password_hash(changeset) do
-    case fetch_change(changeset, :password) do
-      {:ok, password} when is_binary(password) and password != "" ->
-        # CORREÇÃO: Usar a função moderna do Bcrypt: hash_pwd_salt/1
-        password_hash = hash_pwd_salt(password)
+  case fetch_change(changeset, :password) do
+    {:ok, password} when is_binary(password) and password != "" ->
+      password_hash = Bcrypt.hash_pwd_salt(password)
+      changeset
+      |> put_change(:password_hash, password_hash)
+      |> delete_change(:password)
 
-        changeset
-        |> put_change(:password_hash, password_hash)
-        |> delete_change(:password)
-      _ ->
-        changeset
-    end
+    _ ->
+      changeset
   end
+end
 end
