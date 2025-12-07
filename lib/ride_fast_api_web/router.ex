@@ -71,5 +71,13 @@ end
 
     # NOVO ENDPOINT DE LISTAGEM DE DRIVERS
     get "/drivers", DriverController, :index
+    get "/drivers/:id", DriverController, :show
+    post "/drivers", DriverController, :create
+    put  "/drivers/:id", DriverController, :update
+    delete "/drivers/:id", DriverController, :delete
+    get "/drivers/:driver_id/profile", DriverController, :profile
+    post "/drivers/:driver_id/profile", DriverController, :create_profile
+    put  "/drivers/:driver_id/profile",  DriverController, :update_profile
+    post "/drivers/:driver_id/vehicles", DriverController, :create_vehicle
   end
 end

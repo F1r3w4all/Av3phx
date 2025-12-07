@@ -9,3 +9,16 @@
 #
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
+alias RideFastApi.Repo
+alias RideFastApi.Accounts.Language
+
+alias RideFastApi.Repo
+alias RideFastApi.Accounts.Language
+
+Repo.insert!(%Language{
+  name: "Português (Brasil)",
+  code: "pt-BR",
+
+  name: "Inglês",
+  code: "en"# <- preenche o campo obrigatório
+})
