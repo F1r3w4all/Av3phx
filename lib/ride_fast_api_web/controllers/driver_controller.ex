@@ -75,7 +75,7 @@ defmodule RideFastApiWeb.DriverController do
   # GET /api/v1/drivers/:driver_id/profile
   def profile(conn, %{"driver_id" => id}) do
     current = Guardian.Plug.current_resource(conn)
-    driver  = Accounts.get_driver_with_details(id)
+    driver = Accounts.get_driver_with_details(id)
 
     case driver do
       nil ->
@@ -118,7 +118,7 @@ defmodule RideFastApiWeb.DriverController do
   # POST /api/v1/drivers/:driver_id/profile
   def create_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
-    driver  = Accounts.get_driver_with_details(id)
+    driver = Accounts.get_driver_with_details(id)
 
     case driver do
       nil ->
@@ -187,7 +187,7 @@ defmodule RideFastApiWeb.DriverController do
   # PUT /api/v1/drivers/:driver_id/profile
   def update_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
-    driver  = Accounts.get_driver_with_details(id)
+    driver = Accounts.get_driver_with_details(id)
 
     case driver do
       nil ->
@@ -255,7 +255,7 @@ defmodule RideFastApiWeb.DriverController do
   # POST /api/v1/drivers/:driver_id/vehicles
   def create_vehicle(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
-    driver  = Accounts.get_driver_with_details(id)
+    driver = Accounts.get_driver_with_details(id)
 
     case driver do
       nil ->
@@ -331,7 +331,51 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
-   # PUT /api/v1/drivers/:id
+  # GET /api/v1/drivers/:driver_id/vehicles
+  def list_vehicles(conn, %{"driver_id" => id}) do
+    current = Guardian.Plug.current_resource(conn)
+    driver = Accounts.get_driver_with_details(id)
+
+    case driver do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Driver not found"})
+
+      _ ->
+        cond do
+          current.role == "admin" or current.id == driver.id ->
+            # driver.vehicles já vem preloaded pelo get_driver_with_details/1
+            vehicles = driver.vehicles || []
+
+            data =
+              Enum.map(vehicles, fn v ->
+                %{
+                  id: v.id,
+                  driver_id: v.driver_id,
+                  plate: v.plate,
+                  brand: v.brand,
+                  model: v.model,
+                  color: v.color,
+                  year: v.year,
+                  renavam: v.renavam,
+                  chassis: v.chassis
+                }
+              end)
+
+            conn
+            |> put_status(:ok)
+            |> json(%{data: data})
+
+          true ->
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Forbidden"})
+        end
+    end
+  end
+
+  # PUT /api/v1/drivers/:id
   def update(conn, %{"id" => id, "driver" => driver_params}) do
     current = Guardian.Plug.current_resource(conn)
     driver = Accounts.get_driver!(id)

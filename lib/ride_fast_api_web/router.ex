@@ -79,5 +79,6 @@ end
     post "/drivers/:driver_id/profile", DriverController, :create_profile
     put  "/drivers/:driver_id/profile",  DriverController, :update_profile
     post "/drivers/:driver_id/vehicles", DriverController, :create_vehicle
+    get "/drivers/:driver_id/vehicles", DriverController, :list_vehicles
   end
 end
