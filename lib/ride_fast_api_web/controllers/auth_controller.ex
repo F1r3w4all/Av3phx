@@ -109,9 +109,12 @@ end
   end
 
   # Tratamento para JSON sem os campos obrigatórios
-  def login(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "É necessário fornecer email e password."})
+  def login(conn, %{"email" => email, "password" => password}) do
+  with {:ok, user_or_driver} <- Accounts.authenticate_user_or_driver(email, password),
+       {:ok, token, _claims} <- RideFastApi.Guardian.issue(user_or_driver) do
+    json(conn, %{token: token})
+  else
+    _ -> conn |> put_status(:unauthorized) |> json(%{error: "Invalid credentials"})
   end
+end
 end

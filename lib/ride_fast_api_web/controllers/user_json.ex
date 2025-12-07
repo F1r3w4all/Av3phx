@@ -2,10 +2,14 @@ defmodule RideFastApiWeb.UserJSON do
   alias RideFastApi.Accounts.User
 
   @doc """
-  Renders a list of users.
+  Renders a list of users, including pagination metadata.
   """
-  def index(%{users: users}) do
-    %{data: for(user <- users, do: data(user))}
+  # Corrigido para usar a função 'data/1' (que você definiu abaixo) e incluir 'meta'
+  def index(%{users: users, meta: meta}) do
+    %{
+      data: for(user <- users, do: data(user)),
+      meta: meta # Adicionado
+    }
   end
 
   @doc """
@@ -15,13 +19,16 @@ defmodule RideFastApiWeb.UserJSON do
     %{data: data(user)}
   end
 
-  def data(%{user: user}) do
+  # Corrigido para usar pattern matching no struct User diretamente, como no seu código original
+  # Note que a assinatura de `data` na sua função era `data(%{user: user})`,
+  # mas você a chamava diretamente com o struct `user` na compreensão de lista.
+  # Vamos unificar para o padrão mais comum em Views/JSON (recebendo o struct):
+  def data(%User{} = user) do
     %{
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
-      # CORREÇÃO: Usar inserted_at
       created_at: user.inserted_at,
       updated_at: user.updated_at
     }

@@ -11,7 +11,51 @@ defmodule RideFastApi.Accounts do
   # --- Funções de CRUD (Publicadas para uso nos Controllers) ---
 
   # User (Passageiro)
-  def list_users, do: Repo.all(User)
+  def list_users(params \\ %{}) do
+  page = String.to_integer(params["page"] || "1")
+  size = String.to_integer(params["size"] || "20") # Tamanho padrão da página
+
+  # 1. Aplicar filtro (q)
+  filtered_query =
+    User
+    |> apply_search_filter(params["q"])
+    |> order_by([u], desc: u.inserted_at)
+
+  # 2. Contar o total de registros (para a metadata)
+  total_entries = Repo.aggregate(filtered_query, :count)
+
+  # 3. Aplicar offset e limit (paginação manual)
+  offset = (page - 1) * size
+
+  users_query =
+    filtered_query
+    |> limit(^size)
+    |> offset(^offset)
+
+  # 4. Executar a consulta
+  users = Repo.all(users_query)
+
+  # 5. Calcular metadata da paginação
+  meta = %{
+    page: page,
+    size: size,
+    total_entries: total_entries,
+    total_pages: ceil(total_entries / size)
+  }
+
+  {:ok, %{items: users, meta: meta}}
+end
+def get_user(id), do: Repo.get(User, id)
+def get_driver(id), do: Repo.get(Driver, id)
+
+# Função auxiliar para aplicar o filtro 'q' (permanece a mesma)
+defp apply_search_filter(query, nil), do: query
+defp apply_search_filter(query, q) do
+  search_term = "%#{q}%"
+
+  from u in query,
+    where: ilike(u.email, ^search_term) or ilike(u.name, ^search_term)
+end
 
   def get_user!(id), do: Repo.get!(User, id)
 
