@@ -59,27 +59,17 @@ defmodule RideFastApi.Accounts do
   Tenta autenticar um usuário ou motorista (Driver) pelo email e senha.
   """
   def authenticate_user_or_driver(email, password) do
-    # 1. Tenta autenticar um User (Passageiro)
-    user = Repo.get_by(User, email: email)
-
-    case check_credentials(user, password) do
-      {:ok, user} ->
-        {:ok, Map.put(user, :role, "user")}
-
-      # 2. Se falhar, tenta autenticar um Driver (Motorista)
-      _ ->
-        driver = Repo.get_by(Driver, email: email)
-
-        case check_credentials(driver, password) do
-          {:ok, driver} ->
-            {:ok, Map.put(driver, :role, "driver")}
-
-          # 3. Falha geral (email não encontrado ou senha incorreta)
-          _ ->
-            {:error, :unauthorized}
-        end
-    end
+  # Primeiro tenta User
+  case Repo.get_by(User, email: email) |> check_credentials(password) do
+    {:ok, user} -> {:ok, user}
+    _ ->
+      # Depois tenta Driver
+      case Repo.get_by(Driver, email: email) |> check_credentials(password) do
+        {:ok, driver} -> {:ok, driver}
+        _ -> {:error, :unauthorized}
+      end
   end
+end
 
 
   # --- Funções Auxiliares (Privadas) ---

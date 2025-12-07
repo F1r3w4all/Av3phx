@@ -1,6 +1,9 @@
 defmodule RideFastApiWeb.Router do
   use RideFastApiWeb, :router
 
+  import Phoenix.Controller
+  alias RideFastApiWeb.AuthErrorHandler
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -14,46 +17,38 @@ defmodule RideFastApiWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Pipeline de autenticação com Guardian para APIs
+  pipeline :api_auth do
+    plug Guardian.Plug.Pipeline,
+      module: RideFastApi.Guardian,
+      error_handler: AuthErrorHandler
+
+    plug Guardian.Plug.VerifyHeader, claims: %{"typ" => "access"}
+    plug Guardian.Plug.EnsureAuthenticated
+    plug Guardian.Plug.LoadResource
+  end
+
   scope "/", RideFastApiWeb do
     pipe_through :browser
 
     get "/", PageController, :home
   end
 
+  # Rotas públicas da API (registro e login)
   scope "/api/v1", RideFastApiWeb do
-  pipe_through :api # Todas as rotas dentro deste scope usarão o pipeline :api
+    pipe_through :api
 
-  # Escopo específico para autenticação
-  scope "/auth" do
-    # 1. Registro (Endpoint que fizemos na última interação)
-    post "/register", AuthController, :register
-
-    # 2. Login (POST /api/v1/auth/login)
-    post "/login", AuthController, :login
+    post "/auth/register", AuthController, :register
+    post "/auth/login", AuthController, :login
   end
 
-  # Mais tarde, você colocará rotas protegidas como /users e /rides aqui
-end
+  # Rotas protegidas da API (users)
+  scope "/api/v1", RideFastApiWeb do
+    pipe_through [:api, :api_auth]
 
-  # Other scopes may use custom stacks.
-  # scope "/api", RideFastApiWeb do
-  #   pipe_through :api
-  # end
-
-  # Enable LiveDashboard and Swoosh mailbox preview in development
-  if Application.compile_env(:ride_fast_api, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
-    import Phoenix.LiveDashboard.Router
-
-    scope "/dev" do
-      pipe_through :browser
-
-      live_dashboard "/dashboard", metrics: RideFastApiWeb.Telemetry
-      forward "/mailbox", Plug.Swoosh.MailboxPreview
-    end
+    get "/users", UserController, :index
+    get "/users/:id", UserController, :show
+    put "/users/:id", UserController, :update
+    delete "/users/:id", UserController, :delete
   end
 end

@@ -5,73 +5,67 @@ defmodule RideFastApiWeb.AuthController do
   alias RideFastApi.Accounts
   # Alias para o nosso módulo Guardian (onde está a emissão de JWT)
   alias RideFastApi.Guardian
-
+  alias Ecto.Changeset
   # --- 1. POST /api/v1/auth/register ---
 
   @doc "Registra um novo User ou Driver."
   def register(conn, params) do
-    # O corpo esperado inclui "role", "name", "email", "phone" e "password"
-    case Map.get(params, "role") do
-      "user" ->
-        # Delega a criação (com Bcrypt) ao Contexto de Accounts
-        case Accounts.create_user(params) do
-          {:ok, user} ->
-            # 201 Created com as informações do novo User
-            conn
-            |> put_status(:created)
-            |> json(Map.take(user, [:id, :name, :email]))
+  case Map.get(params, "role") do
+    role when role in ["user", "admin"] ->
+      case Accounts.create_user(params) do
+        {:ok, user} ->
+          conn
+          |> put_status(:created)
+          |> json(Map.take(user, [:id, :name, :email, :role]))
 
-          {:error, %{errors: errors}} ->
-            # Tratamento de erros de validação (ex: campos inválidos, senha fraca)
-            conn
-            |> put_status(:bad_request)
-            |> json(%{errors: errors})
+        {:error, %Ecto.Changeset{} = changeset} ->
+          errors =
+            Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
 
-          {:error, %{result: :already_exists}} ->
-            # 409 Conflict (e-mail já cadastrado, decorrente do unique_constraint)
-            conn
-            |> put_status(:conflict)
-            |> json(%{error: "E-mail já cadastrado."})
+          conn
+          |> put_status(:bad_request)
+          |> json(%{errors: errors})
 
-          _ ->
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Erro inesperado ao criar usuário."})
-        end
+        {:error, %{result: :already_exists}} ->
+          conn
+          |> put_status(:conflict)
+          |> json(%{error: "E-mail já cadastrado."})
 
-      "driver" ->
-        # Delega a criação (com Bcrypt) ao Contexto de Accounts
-        case Accounts.create_driver(params) do
-          {:ok, driver} ->
-            # 201 Created com as informações do novo Driver
-            conn
-            |> put_status(:created)
-            |> json(Map.take(driver, [:id, :name, :email]))
+        _ ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Erro inesperado ao criar usuário."})
+      end
 
-          {:error, %{result: :already_exists}} ->
-            conn
-            |> put_status(:conflict)
-            |> json(%{error: "E-mail de motorista já cadastrado."})
+    "driver" ->
+      case Accounts.create_driver(params) do
+        {:ok, driver} ->
+          conn
+          |> put_status(:created)
+          |> json(Map.take(driver, [:id, :name, :email]))
 
-          {:error, %{errors: errors}} ->
-            conn
-            |> put_status(:bad_request)
-            |> json(%{errors: errors})
+        {:error, %{result: :already_exists}} ->
+          conn
+          |> put_status(:conflict)
+          |> json(%{error: "E-mail de motorista já cadastrado."})
 
-          _ ->
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Erro inesperado ao criar motorista."})
-        end
+        {:error, %{errors: errors}} ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{errors: errors})
 
-      _ ->
-        # 400 Bad Request: 'role' inválida ou ausente
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "A 'role' deve ser 'user' ou 'driver'."})
-    end
+        _ ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Erro inesperado ao criar motorista."})
+      end
+
+    _ ->
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "A 'role' deve ser 'user' ou 'driver'."})
   end
-
+end
 
   # --- 2. POST /api/v1/auth/login ---
 

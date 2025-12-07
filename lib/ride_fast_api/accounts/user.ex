@@ -1,9 +1,6 @@
-# lib/ride_fast_api/accounts/user.ex
-
 defmodule RideFastApi.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
-  # CORREÇÃO: Usar o módulo principal Bcrypt
   import Bcrypt
 
   schema "users" do
@@ -11,43 +8,44 @@ defmodule RideFastApi.Accounts.User do
     field :email, :string
     field :phone, :string
     field :password_hash, :string
+    field :role, :string  # <-- REMOVER default aqui (IMPORTANTE)
 
     field :password, :string, virtual: true
 
     timestamps(type: :utc_datetime)
   end
 
+  @roles ~w(user admin)
+
   @doc false
-  # Changeset para ATUALIZAÇÃO
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:name, :email, :phone])
-    |> validate_required([:name, :email, :phone])
+    |> cast(attrs, [:name, :email, :phone, :role])
+    |> validate_required([:name, :email, :phone, :role])
+    |> validate_inclusion(:role, @roles)
     |> unique_constraint(:email)
   end
 
   @doc false
-  # Changeset para REGISTRO
   def registration_changeset(user, attrs) do
     user
-    |> cast(attrs, [:name, :email, :phone, :password])
-    |> validate_required([:name, :email, :phone, :password])
+    |> cast(attrs, [:name, :email, :phone, :password, :role])
+    |> validate_required([:name, :email, :phone, :password, :role])
     |> validate_length(:password, min: 8)
+    |> validate_inclusion(:role, @roles)
     |> unique_constraint(:email)
-    |> put_password_hash() # Insere o hash Bcrypt
+    |> put_password_hash()
   end
 
-  # Função auxiliar para hashear a senha
   defp put_password_hash(changeset) do
-  case fetch_change(changeset, :password) do
-    {:ok, password} when is_binary(password) and password != "" ->
-      password_hash = Bcrypt.hash_pwd_salt(password)
-      changeset
-      |> put_change(:password_hash, password_hash)
-      |> delete_change(:password)
+    case fetch_change(changeset, :password) do
+      {:ok, password} when is_binary(password) and password != "" ->
+        changeset
+        |> put_change(:password_hash, Bcrypt.hash_pwd_salt(password))
+        |> delete_change(:password)
 
-    _ ->
-      changeset
+      _ ->
+        changeset
+    end
   end
-end
 end
