@@ -1,30 +1,26 @@
+# lib/ride_fast_api_web/controllers/driver_json.ex
 defmodule RideFastApiWeb.DriverJSON do
   alias RideFastApi.Accounts.Driver
 
-  @doc """
-  Renders a list of drivers.
-  """
-  def index(%{drivers: drivers}) do
-    %{data: for(driver <- drivers, do: data(driver))}
+  def index(%{drivers: drivers, meta: meta}) do
+    %{
+      data: Enum.map(drivers, &data/1),
+      meta: meta
+    }
   end
 
-  @doc """
-  Renders a single driver.
-  """
   def show(%{driver: driver}) do
     %{data: data(driver)}
   end
 
-  def data(%{driver: driver}) do
+  def data(%Driver{} = driver) do
     %{
       id: driver.id,
       name: driver.name,
       email: driver.email,
       phone: driver.phone,
       status: driver.status,
-      # CORREÇÃO: Usar inserted_at
-      created_at: driver.inserted_at,
-      updated_at: driver.updated_at
+      inserted_at: driver.inserted_at
     }
   end
 end

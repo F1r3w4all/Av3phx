@@ -3,12 +3,23 @@ defmodule RideFastApiWeb.DriverController do
 
   alias RideFastApi.Accounts
   alias RideFastApi.Accounts.Driver
+  alias RideFastApiWeb.DriverJSON
 
   action_fallback RideFastApiWeb.FallbackController
 
-  def index(conn, _params) do
-    drivers = Accounts.list_drivers()
-    render(conn, :index, drivers: drivers)
+  def index(conn, params) do
+    # Chama o contexto Accounts com os parâmetros de paginação e filtro
+    case Accounts.list_drivers(params) do
+      {:ok, %{items: drivers, meta: meta}} ->
+        conn
+        |> put_status(:ok)
+        |> render(DriverJSON, :index, drivers: drivers, meta: meta)
+
+      {:error, reason} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Failed to list drivers: #{reason}"})
+    end
   end
 
   def create(conn, %{"driver" => driver_params}) do

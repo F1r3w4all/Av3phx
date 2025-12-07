@@ -65,4 +65,11 @@ scope "/api/v1", RideFastApiWeb do
   put "/users/:id", UserController, :update
   delete "/users/:id", UserController, :delete
 end
+
+  scope "/api/v1", RideFastApiWeb do
+    pipe_through [:api, :api_auth] # Apenas autenticação JWT é exigida
+
+    # NOVO ENDPOINT DE LISTAGEM DE DRIVERS
+    get "/drivers", DriverController, :index
+  end
 end
