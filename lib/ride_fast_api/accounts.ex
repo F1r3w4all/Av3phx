@@ -1,6 +1,7 @@
 defmodule RideFastApi.Accounts do
   import Ecto.Query, warn: false
   alias RideFastApi.Repo
+  alias RideFastApi.Accounts.Language
   alias RideFastApi.Accounts.{User, Driver, DriverProfile, Vehicle}
 
   import Bcrypt
@@ -54,8 +55,9 @@ defmodule RideFastApi.Accounts do
   defp apply_search_filter(query, q) do
     search_term = "%#{q}%"
 
-    from u in query,
+    from(u in query,
       where: ilike(u.email, ^search_term) or ilike(u.name, ^search_term)
+    )
   end
 
   def get_user!(id), do: Repo.get!(User, id)
@@ -112,8 +114,9 @@ defmodule RideFastApi.Accounts do
   defp apply_status_filter(query, nil), do: query
 
   defp apply_status_filter(query, status) do
-    from d in query,
+    from(d in query,
       where: d.status == ^status
+    )
   end
 
   # (Filtro por idioma via many_to_many pode ser implementado depois com join)
@@ -199,5 +202,78 @@ defmodule RideFastApi.Accounts do
     %Vehicle{}
     |> Vehicle.changeset(attrs)
     |> Repo.insert()
+  end
+
+  def create_language(attrs) do
+    %Language{}
+    |> Language.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def list_languages do
+    Repo.all(Language)
+  end
+
+  def associate_driver_language(driver_id, language_id)
+      when is_integer(driver_id) and is_integer(language_id) do
+    case {Repo.get(Driver, driver_id), Repo.get(Language, language_id)} do
+      {nil, _} ->
+        {:error, :not_found_driver}
+
+      {_, nil} ->
+        {:error, :not_found_language}
+
+      {_driver, _language} ->
+        existing_query =
+          from dl in "drivers_languages",
+            where: dl.driver_id == ^driver_id and dl.language_id == ^language_id,
+            select: dl.driver_id
+
+        case Repo.one(existing_query) do
+          # já existe associação
+          ^driver_id ->
+            {:error, :already_exists}
+
+          nil ->
+            case Repo.insert_all("drivers_languages", [
+                   %{driver_id: driver_id, language_id: language_id}
+                 ]) do
+              {1, _} -> {:ok, :created}
+              {0, _} -> {:error, :insert_failed}
+            end
+        end
+    end
+  rescue
+    e -> {:error, e}
+  end
+
+  def remove_language_from_driver(driver_id, language_id) do
+    query =
+      from(dl in "drivers_languages",
+        where: dl.driver_id == ^driver_id and dl.language_id == ^language_id
+      )
+
+    case Repo.delete_all(query) do
+      {1, _} ->
+        {:ok, :removed}
+
+      {0, _} ->
+        {:error, :not_found}
+    end
+  end
+
+  def list_languages_for_driver(driver_id) do
+    alias RideFastApi.Repo
+    alias RideFastApi.Accounts.Driver
+
+    case Repo.get(Driver, driver_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Driver{} = driver ->
+        # garanta que languages esteja preloaded
+        driver = Repo.preload(driver, :languages)
+        {:ok, driver.languages || []}
+    end
   end
 end

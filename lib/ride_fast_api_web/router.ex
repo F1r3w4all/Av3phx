@@ -44,6 +44,8 @@ defmodule RideFastApiWeb.Router do
 
     post "/auth/register", AuthController, :register
     post "/auth/login", AuthController, :login
+    get "/languages", LanguageController, :index
+    get "/drivers/:driver_id/languages", DriverController, :list_languages
   end
 
   # Rotas protegidas da API (users)
@@ -64,6 +66,7 @@ scope "/api/v1", RideFastApiWeb do
   get "/users/:id", UserController, :show
   put "/users/:id", UserController, :update
   delete "/users/:id", UserController, :delete
+  post "/languages", LanguageController, :create
 end
 
   scope "/api/v1", RideFastApiWeb do
@@ -80,5 +83,7 @@ end
     put  "/drivers/:driver_id/profile",  DriverController, :update_profile
     post "/drivers/:driver_id/vehicles", DriverController, :create_vehicle
     get "/drivers/:driver_id/vehicles", DriverController, :list_vehicles
+    post "/drivers/:driver_id/languages/:language_id", DriverController, :add_language
+    delete "/drivers/:driver_id/languages/:language_id", DriverController, :remove_language
   end
 end

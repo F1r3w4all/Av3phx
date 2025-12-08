@@ -1,3 +1,4 @@
+
 defmodule RideFastApiWeb.DriverController do
   use RideFastApiWeb, :controller
 
@@ -6,7 +7,7 @@ defmodule RideFastApiWeb.DriverController do
   alias RideFastApiWeb.DriverJSON
   alias RideFastApi.Guardian
 
-  action_fallback RideFastApiWeb.FallbackController
+  action_fallback(RideFastApiWeb.FallbackController)
 
   # GET /api/v1/drivers
   def index(conn, params) do
@@ -428,6 +429,138 @@ defmodule RideFastApiWeb.DriverController do
           |> put_status(:internal_server_error)
           |> json(%{error: "Erro ao deletar driver."})
       end
+    end
+  end
+
+  def add_language(conn, %{"driver_id" => driver_id_str, "language_id" => language_id_str}) do
+    # converte ids
+    with {driver_id, ""} <- Integer.parse(driver_id_str),
+         {language_id, ""} <- Integer.parse(language_id_str) do
+      # use a chamada qualificada para evitar problemas de import/compilação
+      current = Guardian.Plug.current_resource(conn)
+
+      # verifica autorização: admin ou driver dono
+      cond do
+        authorized_to_modify_driver?(current, driver_id) ->
+          case RideFastApi.Accounts.associate_driver_language(driver_id, language_id) do
+            {:ok, :created} ->
+              conn
+              |> put_status(:created)
+              |> json(%{driver_id: driver_id, language_id: language_id})
+
+            {:error, :already_exists} ->
+              conn
+              |> put_status(:conflict)
+              |> json(%{error: "Association already exists"})
+
+            {:error, :not_found_driver} ->
+              conn
+              |> put_status(:not_found)
+              |> json(%{error: "Driver not found"})
+
+            {:error, :not_found_language} ->
+              conn
+              |> put_status(:not_found)
+              |> json(%{error: "Language not found"})
+
+            {:error, reason} ->
+              conn
+              |> put_status(:internal_server_error)
+              |> json(%{error: "Could not associate language", reason: inspect(reason)})
+          end
+
+        true ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Forbidden"})
+      end
+    else
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid id format"})
+    end
+  end
+
+  defp authorized_to_modify_driver?(nil, _driver_id), do: false
+
+  # Admin pode tudo
+  defp authorized_to_modify_driver?(%{role: "admin"}, _driver_id), do: true
+
+  # Driver só pode modificar a si próprio
+  defp authorized_to_modify_driver?(%{role: "driver", id: id}, driver_id)
+       when is_integer(id) do
+    id == driver_id
+  end
+
+  # Fallback
+  defp authorized_to_modify_driver?(_current, _driver_id), do: false
+
+  def remove_language(conn, %{"driver_id" => driver_id_str, "language_id" => language_id_str}) do
+    current = Guardian.Plug.current_resource(conn)
+
+    # valida ids
+    with {driver_id, ""} <- Integer.parse(driver_id_str),
+         {language_id, ""} <- Integer.parse(language_id_str) do
+      cond do
+        current == nil ->
+          conn
+          |> put_status(:unauthorized)
+          |> json(%{error: "Unauthorized"})
+
+        not authorized_to_modify_driver?(current, driver_id) ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Forbidden"})
+
+        true ->
+          case RideFastApi.Accounts.remove_language_from_driver(driver_id, language_id) do
+            {:ok, :removed} ->
+              send_resp(conn, :no_content, "")
+
+            {:error, :not_found} ->
+              conn
+              |> put_status(:not_found)
+              |> json(%{error: "Association not found"})
+          end
+      end
+    else
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid id format"})
+    end
+  end
+
+  # GET /api/v1/drivers/:driver_id/languages
+  def list_languages(conn, %{"driver_id" => driver_id_str}) do
+    # permite id tanto string quanto int
+    with {driver_id, ""} <- Integer.parse(driver_id_str) do
+      case RideFastApi.Accounts.list_languages_for_driver(driver_id) do
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Driver not found"})
+
+        {:ok, languages} ->
+          data =
+            Enum.map(languages, fn lang ->
+              %{
+                id: lang.id,
+                code: lang.code,
+                name: lang.name
+              }
+            end)
+
+          conn
+          |> put_status(:ok)
+          |> json(%{data: data})
+      end
+    else
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid driver id"})
     end
   end
 end
