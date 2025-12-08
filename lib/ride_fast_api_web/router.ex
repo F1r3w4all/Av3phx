@@ -95,6 +95,10 @@ end
     get "/rides", RideController, :index
     get "/rides/:id", RideController, :show
     post "/rides/:id/accept", RideController, :accept
+    post "/rides/:id/start", RideController, :start
+    post "/rides/:id/complete", RideController, :complete
+    post "/rides/:id/cancel", RideController, :cancel
+    get "/rides/:id/history", RideController, :history
 
   end
 end
