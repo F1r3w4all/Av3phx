@@ -12,9 +12,11 @@ defmodule RideFastApi.Accounts.Driver do
     field :phone, :string
     field :password_hash, :string
     field :status, :string
+
     field :password, :string, virtual: true
     has_many :vehicles, RideFastApi.Accounts.Vehicle, foreign_key: :driver_id, where: [deleted_at: nil]
     has_one :profile, RideFastApi.Accounts.DriverProfile, foreign_key: :driver_id
+
 
     many_to_many :languages, Language,
       join_through: "drivers_languages",

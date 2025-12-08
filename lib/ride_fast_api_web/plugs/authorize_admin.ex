@@ -5,14 +5,16 @@ defmodule RideFastApiWeb.Plugs.AuthorizeAdmin do
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    case Guardian.Plug.current_resource(conn) do
-      %{role: "admin"} ->
-        conn
+    claims = Guardian.Plug.current_claims(conn)
+    role   = claims && claims["role"]
 
-      _ ->
-        conn
-        |> send_resp(403, ~s({"error":"forbidden"}))
-        |> halt()
+    if role == "admin" do
+      conn
+    else
+      conn
+      |> put_status(:forbidden)
+      |> Phoenix.Controller.json(%{error: "Forbidden"})
+      |> halt()
     end
   end
 end

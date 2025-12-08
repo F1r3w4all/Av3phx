@@ -76,6 +76,9 @@ defmodule RideFastApiWeb.DriverController do
   # GET /api/v1/drivers/:driver_id/profile
   def profile(conn, %{"driver_id" => id}) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims["role"]
+
     driver = Accounts.get_driver_with_details(id)
 
     case driver do
@@ -86,27 +89,11 @@ defmodule RideFastApiWeb.DriverController do
 
       _ ->
         cond do
-          current.role == "admin" or current.id == driver.id ->
-            profile =
-              case driver.profile do
-                nil ->
-                  nil
+          current_role == "admin" ->
+            do_profile_response(conn, driver)
 
-                p ->
-                  %{
-                    address: p.address,
-                    city: p.city,
-                    state: p.state,
-                    zip_code: p.zip_code,
-                    birth_date: p.birth_date,
-                    cnh_number: p.cnh_number,
-                    cnh_category: p.cnh_category
-                  }
-              end
-
-            conn
-            |> put_status(:ok)
-            |> json(%{data: profile})
+          current && current.id == driver.id ->
+            do_profile_response(conn, driver)
 
           true ->
             conn
@@ -116,9 +103,35 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
+  defp do_profile_response(conn, driver) do
+    profile =
+      case driver.profile do
+        nil ->
+          nil
+
+        p ->
+          %{
+            address: p.address,
+            city: p.city,
+            state: p.state,
+            zip_code: p.zip_code,
+            birth_date: p.birth_date,
+            cnh_number: p.cnh_number,
+            cnh_category: p.cnh_category
+          }
+      end
+
+    conn
+    |> put_status(:ok)
+    |> json(%{data: profile})
+  end
+
   # POST /api/v1/drivers/:driver_id/profile
   def create_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims["role"]
+
     driver = Accounts.get_driver_with_details(id)
 
     case driver do
@@ -129,7 +142,10 @@ defmodule RideFastApiWeb.DriverController do
 
       _ ->
         cond do
-          current.role == "admin" or current.id == driver.id ->
+          current_role == "admin" ->
+            do_create_profile(conn, driver, params)
+
+          current && current.id == driver.id ->
             do_create_profile(conn, driver, params)
 
           true ->
@@ -188,6 +204,9 @@ defmodule RideFastApiWeb.DriverController do
   # PUT /api/v1/drivers/:driver_id/profile
   def update_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims["role"]
+
     driver = Accounts.get_driver_with_details(id)
 
     case driver do
@@ -198,7 +217,10 @@ defmodule RideFastApiWeb.DriverController do
 
       _ ->
         cond do
-          current.role == "admin" or current.id == driver.id ->
+          current_role == "admin" ->
+            do_update_profile(conn, driver, params)
+
+          current && current.id == driver.id ->
             do_update_profile(conn, driver, params)
 
           true ->
@@ -328,6 +350,9 @@ defmodule RideFastApiWeb.DriverController do
   # GET /api/v1/drivers/:driver_id/vehicles
   def list_vehicles(conn, %{"driver_id" => id}) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims["role"]
+
     driver = Accounts.get_driver_with_details(id)
 
     case driver do
@@ -338,25 +363,13 @@ defmodule RideFastApiWeb.DriverController do
 
       _ ->
         cond do
-          current.role == "admin" or current.id == driver.id ->
-            # driver.vehicles já vem preloaded pelo get_driver_with_details/1
-            vehicles = driver.vehicles || []
+          current_role == "admin" ->
+            # admin vê qualquer driver
+            send_vehicles(conn, driver)
 
-            data =
-              Enum.map(vehicles, fn v ->
-                %{
-                  id: v.id,
-                  driver_id: v.driver_id,
-                  plate: v.plate,
-                  model: v.model,
-                  color: v.color,
-                  seats: v.seats
-                }
-              end)
-
-            conn
-            |> put_status(:ok)
-            |> json(%{data: data})
+          current && current.id == driver.id ->
+            # driver dono
+            send_vehicles(conn, driver)
 
           true ->
             conn
@@ -364,6 +377,26 @@ defmodule RideFastApiWeb.DriverController do
             |> json(%{error: "Forbidden"})
         end
     end
+  end
+
+  defp send_vehicles(conn, driver) do
+    vehicles = driver.vehicles || []
+
+    data =
+      Enum.map(vehicles, fn v ->
+        %{
+          id: v.id,
+          driver_id: v.driver_id,
+          plate: v.plate,
+          model: v.model,
+          color: v.color,
+          seats: v.seats
+        }
+      end)
+
+    conn
+    |> put_status(:ok)
+    |> json(%{data: data})
   end
 
   # PUT /api/v1/vehicles/:id
