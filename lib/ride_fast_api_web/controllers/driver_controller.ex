@@ -251,7 +251,8 @@ defmodule RideFastApiWeb.DriverController do
         end
     end
   end
-#=====veiculos===
+
+  # =====veiculos===
   # POST /api/v1/drivers/:driver_id/vehicles
   def create_vehicle(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
@@ -282,11 +283,7 @@ defmodule RideFastApiWeb.DriverController do
       plate: Map.get(params, "plate"),
       model: Map.get(params, "model"),
       color: Map.get(params, "color"),
-      # campos extras do schema: ajuste se quiser usar brand/year/renavam/chassis
-      brand: Map.get(params, "brand"),
-      year: Map.get(params, "year"),
-      renavam: Map.get(params, "renavam"),
-      chassis: Map.get(params, "chassis")
+      seats: Map.get(params, "seats")
     }
 
     case Accounts.create_vehicle(attrs) do
@@ -300,17 +297,13 @@ defmodule RideFastApiWeb.DriverController do
             plate: vehicle.plate,
             model: vehicle.model,
             color: vehicle.color,
-            brand: vehicle.brand,
-            year: vehicle.year,
-            renavam: vehicle.renavam,
-            chassis: vehicle.chassis
+            seats: vehicle.seats
           }
         })
 
       {:error, %Ecto.Changeset{} = changeset} ->
         case Keyword.get(changeset.errors, :plate) do
           {_, opts} ->
-            # opts é a keyword list de metadados do erro; se tiver constraint: :unique, tratamos como 409
             case Keyword.get(opts, :constraint) do
               :unique ->
                 conn
@@ -354,12 +347,9 @@ defmodule RideFastApiWeb.DriverController do
                   id: v.id,
                   driver_id: v.driver_id,
                   plate: v.plate,
-                  brand: v.brand,
                   model: v.model,
                   color: v.color,
-                  year: v.year,
-                  renavam: v.renavam,
-                  chassis: v.chassis
+                  seats: v.seats
                 }
               end)
 
@@ -414,12 +404,9 @@ defmodule RideFastApiWeb.DriverController do
   defp do_update_vehicle(conn, vehicle, params) do
     attrs = %{
       plate: Map.get(params, "plate", vehicle.plate),
-      brand: Map.get(params, "brand", vehicle.brand),
       model: Map.get(params, "model", vehicle.model),
       color: Map.get(params, "color", vehicle.color),
-      year: Map.get(params, "year", vehicle.year),
-      renavam: Map.get(params, "renavam", vehicle.renavam),
-      chassis: Map.get(params, "chassis", vehicle.chassis)
+      seats: Map.get(params, "seats", vehicle.seats)
     }
 
     case Accounts.update_vehicle(vehicle, attrs) do
@@ -431,12 +418,9 @@ defmodule RideFastApiWeb.DriverController do
             id: vehicle.id,
             driver_id: vehicle.driver_id,
             plate: vehicle.plate,
-            brand: vehicle.brand,
             model: vehicle.model,
             color: vehicle.color,
-            year: vehicle.year,
-            renavam: vehicle.renavam,
-            chassis: vehicle.chassis
+            seats: vehicle.seats
           }
         })
 

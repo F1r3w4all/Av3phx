@@ -173,6 +173,11 @@ defmodule RideFastApi.Accounts do
           {:ok, driver} -> {:ok, driver}
           _ -> {:error, :unauthorized}
         end
+
+        case Repo.get_by(Driver, email: email) |> check_credentials(password) do
+          {:ok, driver} -> {:ok, Map.put(driver, :role, "driver")}
+          _ -> {:error, :unauthorized}
+        end
     end
   end
 
@@ -215,14 +220,14 @@ defmodule RideFastApi.Accounts do
   end
 
   def soft_delete_vehicle(%Vehicle{} = vehicle) do
-  now =
-    DateTime.utc_now()
-    |> DateTime.truncate(:second)
+    now =
+      DateTime.utc_now()
+      |> DateTime.truncate(:second)
 
-  vehicle
-  |> Ecto.Changeset.change(%{deleted_at: now})
-  |> Repo.update()
-end
+    vehicle
+    |> Ecto.Changeset.change(%{deleted_at: now})
+    |> Repo.update()
+  end
 
   # ===linguagens===
   def create_language(attrs) do
