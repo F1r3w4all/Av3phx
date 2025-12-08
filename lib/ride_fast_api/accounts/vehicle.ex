@@ -3,16 +3,13 @@ defmodule RideFastApi.Accounts.Vehicle do
   import Ecto.Changeset
 
   schema "vehicles" do
-    # O veículo pertence a um Driver.
     belongs_to :driver, RideFastApi.Accounts.Driver, foreign_key: :driver_id
 
     field :plate, :string
-    field :brand, :string
     field :model, :string
     field :color, :string
-    field :year, :integer
-    field :renavam, :string
-    field :chassis, :string
+    field :seats, :integer
+    field :deleted_at, :utc_datetime
 
     timestamps(type: :utc_datetime)
   end
@@ -20,12 +17,8 @@ defmodule RideFastApi.Accounts.Vehicle do
   @doc false
   def changeset(vehicle, attrs) do
     vehicle
-    |> cast(attrs, [:plate, :brand, :model, :color, :year, :renavam, :chassis, :driver_id])
-    |> validate_required([:plate, :brand, :model, :year, :driver_id, :renavam, :chassis])
-    |> validate_length(:plate, is: 7)
+    |> cast(attrs, [:driver_id, :plate, :model, :color, :seats, :deleted_at])
+    |> validate_required([:driver_id, :plate, :model, :color, :seats])
     |> unique_constraint(:plate)
-    |> unique_constraint(:renavam)
-    |> unique_constraint(:chassis)
-    |> foreign_key_constraint(:driver_id)
   end
 end

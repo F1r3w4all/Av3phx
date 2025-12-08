@@ -85,5 +85,7 @@ end
     get "/drivers/:driver_id/vehicles", DriverController, :list_vehicles
     post "/drivers/:driver_id/languages/:language_id", DriverController, :add_language
     delete "/drivers/:driver_id/languages/:language_id", DriverController, :remove_language
+    put "/vehicles/:id", DriverController, :update_vehicle
+    delete "/vehicles/:id", DriverController, :delete_vehicle
   end
 end

@@ -186,6 +186,7 @@ defmodule RideFastApi.Accounts do
     end
   end
 
+  # ==driver profile===
   def create_driver_profile(attrs) do
     %DriverProfile{}
     |> DriverProfile.changeset(attrs)
@@ -198,12 +199,32 @@ defmodule RideFastApi.Accounts do
     |> Repo.update()
   end
 
+  # ===veiculos===
   def create_vehicle(attrs) do
     %Vehicle{}
     |> Vehicle.changeset(attrs)
     |> Repo.insert()
   end
 
+  def get_vehicle(id), do: Repo.get(Vehicle, id)
+
+  def update_vehicle(%Vehicle{} = vehicle, attrs) do
+    vehicle
+    |> Vehicle.changeset(attrs)
+    |> Repo.update()
+  end
+
+  def soft_delete_vehicle(%Vehicle{} = vehicle) do
+  now =
+    DateTime.utc_now()
+    |> DateTime.truncate(:second)
+
+  vehicle
+  |> Ecto.Changeset.change(%{deleted_at: now})
+  |> Repo.update()
+end
+
+  # ===linguagens===
   def create_language(attrs) do
     %Language{}
     |> Language.changeset(attrs)

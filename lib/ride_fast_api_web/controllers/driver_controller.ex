@@ -1,4 +1,3 @@
-
 defmodule RideFastApiWeb.DriverController do
   use RideFastApiWeb, :controller
 
@@ -252,7 +251,7 @@ defmodule RideFastApiWeb.DriverController do
         end
     end
   end
-
+#=====veiculos===
   # POST /api/v1/drivers/:driver_id/vehicles
   def create_vehicle(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
@@ -373,6 +372,126 @@ defmodule RideFastApiWeb.DriverController do
             |> put_status(:forbidden)
             |> json(%{error: "Forbidden"})
         end
+    end
+  end
+
+  # PUT /api/v1/vehicles/:id
+  # Body: qualquer combinação de plate, brand, model, color, year, renavam, chassis
+  def update_vehicle(conn, %{"id" => id} = params) do
+    current = Guardian.Plug.current_resource(conn)
+
+    case Accounts.get_vehicle(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Vehicle not found"})
+
+      vehicle ->
+        # carrega o driver dono do veículo
+        vehicle = RideFastApi.Repo.preload(vehicle, :driver)
+        driver = vehicle.driver
+
+        cond do
+          current == nil ->
+            conn
+            |> put_status(:unauthorized)
+            |> json(%{error: "Unauthorized"})
+
+          current.role == "admin" ->
+            do_update_vehicle(conn, vehicle, params)
+
+          driver != nil and current.id == driver.id ->
+            do_update_vehicle(conn, vehicle, params)
+
+          true ->
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Forbidden"})
+        end
+    end
+  end
+
+  defp do_update_vehicle(conn, vehicle, params) do
+    attrs = %{
+      plate: Map.get(params, "plate", vehicle.plate),
+      brand: Map.get(params, "brand", vehicle.brand),
+      model: Map.get(params, "model", vehicle.model),
+      color: Map.get(params, "color", vehicle.color),
+      year: Map.get(params, "year", vehicle.year),
+      renavam: Map.get(params, "renavam", vehicle.renavam),
+      chassis: Map.get(params, "chassis", vehicle.chassis)
+    }
+
+    case Accounts.update_vehicle(vehicle, attrs) do
+      {:ok, vehicle} ->
+        conn
+        |> put_status(:ok)
+        |> json(%{
+          data: %{
+            id: vehicle.id,
+            driver_id: vehicle.driver_id,
+            plate: vehicle.plate,
+            brand: vehicle.brand,
+            model: vehicle.model,
+            color: vehicle.color,
+            year: vehicle.year,
+            renavam: vehicle.renavam,
+            chassis: vehicle.chassis
+          }
+        })
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        # não foi pedido, mas evita 500
+        |> put_status(:bad_request)
+        |> render(RideFastApiWeb.ChangesetJSON, :error, changeset: changeset)
+    end
+  end
+
+  # DELETE /api/v1/vehicles/:id
+  def delete_vehicle(conn, %{"id" => id}) do
+    current = Guardian.Plug.current_resource(conn)
+
+    case Accounts.get_vehicle(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Vehicle not found"})
+
+      vehicle ->
+        vehicle = RideFastApi.Repo.preload(vehicle, :driver)
+        driver = vehicle.driver
+
+        cond do
+          current == nil ->
+            conn
+            |> put_status(:unauthorized)
+            |> json(%{error: "Unauthorized"})
+
+          current.role == "admin" ->
+            do_delete_vehicle(conn, vehicle)
+
+          driver != nil and current.id == driver.id ->
+            do_delete_vehicle(conn, vehicle)
+
+          true ->
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Forbidden"})
+        end
+    end
+  end
+
+  defp do_delete_vehicle(conn, vehicle) do
+    case Accounts.soft_delete_vehicle(vehicle) do
+      {:ok, _} ->
+        # 204 No Content, sem body
+        send_resp(conn, :no_content, "")
+
+      {:error, _reason} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Could not delete vehicle"})
     end
   end
 
