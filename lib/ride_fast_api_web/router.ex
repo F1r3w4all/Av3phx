@@ -71,7 +71,7 @@ end
 
   scope "/api/v1", RideFastApiWeb do
     pipe_through [:api, :api_auth] # Apenas autenticação JWT é exigida
-
+     #rating (avaliacao) matheus conferir se esta certo
     # NOVO ENDPOINT DE LISTAGEM DE DRIVERS
     get "/drivers", DriverController, :index
     get "/drivers/:id", DriverController, :show
@@ -99,6 +99,13 @@ end
     post "/rides/:id/complete", RideController, :complete
     post "/rides/:id/cancel", RideController, :cancel
     get "/rides/:id/history", RideController, :history
+
+    #rating (avaliacao) matheus conferir se esta certo
+    post "/rides/:id/ratings", RideController, :rate
+    get "/rides/:id/ratings", RideController, :ratings
+    get "/drivers/:id/ratings", DriverController, :ratings
+
+
 
   end
 end

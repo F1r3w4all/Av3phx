@@ -5,6 +5,7 @@ defmodule RideFastApiWeb.DriverController do
   alias RideFastApi.Accounts.Driver
   alias RideFastApiWeb.DriverJSON
   alias RideFastApi.Guardian
+  alias RideFastApi.Rides
 
   action_fallback(RideFastApiWeb.FallbackController)
 
@@ -664,6 +665,28 @@ defmodule RideFastApiWeb.DriverController do
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Invalid driver id"})
+    end
+  end
+
+  def ratings(conn, %{"id" => id}) do
+    case Rides.list_ratings_for_driver(id) do
+      {:ok, %{items: ratings, average: avg}} ->
+        data =
+          Enum.map(ratings, fn r ->
+            %{
+              id: r.id,
+              ride_id: r.ride_id,
+              from_id: r.from_id,
+              to_id: r.to_id,
+              score: r.score,
+              comment: r.comment,
+              inserted_at: r.inserted_at
+            }
+          end)
+
+        conn
+        |> put_status(:ok)
+        |> json(%{data: data, average_score: avg})
     end
   end
 end

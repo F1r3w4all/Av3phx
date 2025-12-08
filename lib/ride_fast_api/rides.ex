@@ -4,6 +4,8 @@ defmodule RideFastApi.Rides do
   alias RideFastApi.Rides.Ride
   alias RideFastApi.Accounts.Driver
   alias RideFastApi.Rides.RideEvent
+  alias RideFastApi.Ratings.Rating
+  alias RideFastApi.Accounts.User
 
   def create_ride(attrs) do
     %Ride{}
@@ -289,5 +291,88 @@ defmodule RideFastApi.Rides do
       reason: reason
     })
     |> Repo.insert()
+  end
+
+  def create_rating(ride_id, actor, params) do
+    # actor = %{id: current.id, role: current.role}
+    case Repo.get(Ride, ride_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Ride{} = ride ->
+        # só depois de FINALIZADA
+        if ride.status != "FINALIZADA" do
+          {:error, :invalid_status}
+        else
+          # participantes válidos
+          allowed? =
+            case actor.role do
+              "user" -> ride.user_id == actor.id
+              "driver" -> ride.driver_id == actor.id
+              _ -> false
+            end
+
+          if not allowed? do
+            {:error, :forbidden}
+          else
+            from_id = actor.id
+
+            # destino é o outro lado da corrida
+            to_id =
+              case actor.role do
+                "user" -> ride.driver_id
+                "driver" -> ride.user_id
+              end
+
+            attrs = %{
+              "ride_id" => ride.id,
+              "from_id" => from_id,
+              "to_id" => to_id,
+              "score" => Map.get(params, "score"),
+              "comment" => Map.get(params, "comment")
+            }
+
+            %Rating{}
+            |> Rating.changeset(attrs)
+            |> Repo.insert()
+          end
+        end
+    end
+  end
+
+  # rating listagem
+  def list_ratings_for_ride(ride_id) do
+    query =
+      from r in RideFastApi.Ratings.Rating,
+        where: r.ride_id == ^ride_id,
+        order_by: [desc: r.inserted_at]
+
+    ratings = Repo.all(query)
+
+    avg_score =
+      case ratings do
+        [] -> nil
+        _ -> Enum.sum(Enum.map(ratings, & &1.score)) / length(ratings)
+      end
+
+    {:ok, %{items: ratings, average: avg_score}}
+  end
+
+  # rating listagem driver
+  def list_ratings_for_driver(driver_id) do
+    query =
+      from r in RideFastApi.Ratings.Rating,
+        where: r.to_id == ^driver_id,
+        order_by: [desc: r.inserted_at]
+
+    ratings = Repo.all(query)
+
+    avg_score =
+      case ratings do
+        [] -> nil
+        _ -> Enum.sum(Enum.map(ratings, & &1.score)) / length(ratings)
+      end
+
+    {:ok, %{items: ratings, average: avg_score}}
   end
 end

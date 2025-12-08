@@ -486,4 +486,76 @@ defmodule RideFastApiWeb.RideController do
         end
     end
   end
+
+  def rate(conn, %{"id" => id} = params) do
+    current = Guardian.Plug.current_resource(conn)
+
+    # só user ou driver podem avaliar
+    if current.role not in ["user", "driver"] do
+      conn
+      |> put_status(:forbidden)
+      |> json(%{error: "Forbidden"})
+    else
+      actor = %{id: current.id, role: current.role}
+
+      case Rides.create_rating(id, actor, params) do
+        {:ok, rating} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            data: %{
+              id: rating.id,
+              ride_id: rating.ride_id,
+              from_id: rating.from_id,
+              to_id: rating.to_id,
+              score: rating.score,
+              comment: rating.comment,
+              inserted_at: rating.inserted_at
+            }
+          })
+
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Ride not found"})
+
+        {:error, :forbidden} ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Only participants can rate this ride"})
+
+        {:error, :invalid_status} ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "Ride must be FINALIZADA to be rated"})
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:bad_request)
+          |> render(RideFastApiWeb.ChangesetJSON, :error, changeset: changeset)
+      end
+    end
+  end
+
+  def ratings(conn, %{"id" => id}) do
+    case Rides.list_ratings_for_ride(id) do
+      {:ok, %{items: ratings, average: avg}} ->
+        data =
+          Enum.map(ratings, fn r ->
+            %{
+              id: r.id,
+              ride_id: r.ride_id,
+              from_id: r.from_id,
+              to_id: r.to_id,
+              score: r.score,
+              comment: r.comment,
+              inserted_at: r.inserted_at
+            }
+          end)
+
+        conn
+        |> put_status(:ok)
+        |> json(%{data: data, average_score: avg})
+    end
+  end
 end
