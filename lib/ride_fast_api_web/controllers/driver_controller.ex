@@ -27,8 +27,10 @@ defmodule RideFastApiWeb.DriverController do
   # POST /api/v1/drivers (admin, via JWT)
   def create(conn, params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
 
-    if current.role != "admin" do
+    if current_role != "admin" do
       conn
       |> put_status(:forbidden)
       |> json(%{error: "Forbidden"})
@@ -77,7 +79,7 @@ defmodule RideFastApiWeb.DriverController do
   def profile(conn, %{"driver_id" => id}) do
     current = Guardian.Plug.current_resource(conn)
     claims = Guardian.Plug.current_claims(conn)
-    current_role = claims["role"]
+    current_role = claims && claims["role"]
 
     driver = Accounts.get_driver_with_details(id)
 
@@ -111,13 +113,11 @@ defmodule RideFastApiWeb.DriverController do
 
         p ->
           %{
-            address: p.address,
-            city: p.city,
-            state: p.state,
-            zip_code: p.zip_code,
-            birth_date: p.birth_date,
-            cnh_number: p.cnh_number,
-            cnh_category: p.cnh_category
+            id: p.id,
+            driver_id: p.driver_id,
+            license_number: p.license_number,
+            license_expiry: p.license_expiry,
+            background_check_ok: p.background_check_ok
           }
       end
 
@@ -130,7 +130,7 @@ defmodule RideFastApiWeb.DriverController do
   def create_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
     claims = Guardian.Plug.current_claims(conn)
-    current_role = claims["role"]
+    current_role = claims && claims["role"]
 
     driver = Accounts.get_driver_with_details(id)
 
@@ -166,13 +166,9 @@ defmodule RideFastApiWeb.DriverController do
       nil ->
         attrs = %{
           driver_id: driver.id,
-          cnh_number: Map.get(params, "license_number"),
-          cnh_category: Map.get(params, "license_category"),
-          address: Map.get(params, "address"),
-          city: Map.get(params, "city"),
-          state: Map.get(params, "state"),
-          zip_code: Map.get(params, "zip_code"),
-          birth_date: Map.get(params, "birth_date")
+          license_number: Map.get(params, "license_number"),
+          license_expiry: Map.get(params, "license_expiry"),
+          background_check_ok: Map.get(params, "background_check_ok", false)
         }
 
         case Accounts.create_driver_profile(attrs) do
@@ -183,13 +179,9 @@ defmodule RideFastApiWeb.DriverController do
               data: %{
                 id: profile.id,
                 driver_id: profile.driver_id,
-                address: profile.address,
-                city: profile.city,
-                state: profile.state,
-                zip_code: profile.zip_code,
-                birth_date: profile.birth_date,
-                cnh_number: profile.cnh_number,
-                cnh_category: profile.cnh_category
+                license_number: profile.license_number,
+                license_expiry: profile.license_expiry,
+                background_check_ok: profile.background_check_ok
               }
             })
 
@@ -205,7 +197,7 @@ defmodule RideFastApiWeb.DriverController do
   def update_profile(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
     claims = Guardian.Plug.current_claims(conn)
-    current_role = claims["role"]
+    current_role = claims && claims["role"]
 
     driver = Accounts.get_driver_with_details(id)
 
@@ -240,13 +232,9 @@ defmodule RideFastApiWeb.DriverController do
 
       profile ->
         attrs = %{
-          cnh_number: Map.get(params, "license_number", profile.cnh_number),
-          cnh_category: Map.get(params, "license_category", profile.cnh_category),
-          address: Map.get(params, "address", profile.address),
-          city: Map.get(params, "city", profile.city),
-          state: Map.get(params, "state", profile.state),
-          zip_code: Map.get(params, "zip_code", profile.zip_code),
-          birth_date: Map.get(params, "birth_date", profile.birth_date)
+          license_number: Map.get(params, "license_number", profile.license_number),
+          license_expiry: Map.get(params, "license_expiry", profile.license_expiry),
+          background_check_ok: Map.get(params, "background_check_ok", profile.background_check_ok)
         }
 
         case Accounts.update_driver_profile(profile, attrs) do
@@ -257,13 +245,9 @@ defmodule RideFastApiWeb.DriverController do
               data: %{
                 id: profile.id,
                 driver_id: profile.driver_id,
-                address: profile.address,
-                city: profile.city,
-                state: profile.state,
-                zip_code: profile.zip_code,
-                birth_date: profile.birth_date,
-                cnh_number: profile.cnh_number,
-                cnh_category: profile.cnh_category
+                license_number: profile.license_number,
+                license_expiry: profile.license_expiry,
+                background_check_ok: profile.background_check_ok
               }
             })
 
@@ -279,6 +263,9 @@ defmodule RideFastApiWeb.DriverController do
   # POST /api/v1/drivers/:driver_id/vehicles
   def create_vehicle(conn, %{"driver_id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
+
     driver = Accounts.get_driver_with_details(id)
 
     case driver do
@@ -289,7 +276,12 @@ defmodule RideFastApiWeb.DriverController do
 
       _ ->
         cond do
-          current.role == "admin" or current.id == driver.id ->
+          # Admin pode criar veículo para qualquer driver
+          current_role == "admin" ->
+            do_create_vehicle(conn, driver, params)
+
+          # Driver dono pode criar veículo para si
+          current && current.id == driver.id ->
             do_create_vehicle(conn, driver, params)
 
           true ->
@@ -301,12 +293,21 @@ defmodule RideFastApiWeb.DriverController do
   end
 
   defp do_create_vehicle(conn, driver, params) do
+    # Se quiser manter logs de debug, pode inspecionar aqui:
+    current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+
+    IO.inspect(current, label: "CURRENT_RESOURCE")
+    IO.inspect(claims, label: "CURRENT_CLAIMS")
+
     attrs = %{
       driver_id: driver.id,
       plate: Map.get(params, "plate"),
       model: Map.get(params, "model"),
       color: Map.get(params, "color"),
       seats: Map.get(params, "seats")
+      # se tiver campo active no schema, pode adicionar:
+      # active: Map.get(params, "active", true)
     }
 
     case Accounts.create_vehicle(attrs) do
@@ -403,6 +404,8 @@ defmodule RideFastApiWeb.DriverController do
   # Body: qualquer combinação de plate, brand, model, color, year, renavam, chassis
   def update_vehicle(conn, %{"id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
 
     case Accounts.get_vehicle(id) do
       nil ->
@@ -411,7 +414,6 @@ defmodule RideFastApiWeb.DriverController do
         |> json(%{error: "Vehicle not found"})
 
       vehicle ->
-        # carrega o driver dono do veículo
         vehicle = RideFastApi.Repo.preload(vehicle, :driver)
         driver = vehicle.driver
 
@@ -421,10 +423,10 @@ defmodule RideFastApiWeb.DriverController do
             |> put_status(:unauthorized)
             |> json(%{error: "Unauthorized"})
 
-          current.role == "admin" ->
+          current_role == "admin" ->
             do_update_vehicle(conn, vehicle, params)
 
-          driver != nil and current.id == driver.id ->
+          (driver != nil and current) && current.id == driver.id ->
             do_update_vehicle(conn, vehicle, params)
 
           true ->
@@ -469,6 +471,8 @@ defmodule RideFastApiWeb.DriverController do
   # DELETE /api/v1/vehicles/:id
   def delete_vehicle(conn, %{"id" => id}) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
 
     case Accounts.get_vehicle(id) do
       nil ->
@@ -486,10 +490,10 @@ defmodule RideFastApiWeb.DriverController do
             |> put_status(:unauthorized)
             |> json(%{error: "Unauthorized"})
 
-          current.role == "admin" ->
+          current_role == "admin" ->
             do_delete_vehicle(conn, vehicle)
 
-          driver != nil and current.id == driver.id ->
+          (driver != nil and current) && current.id == driver.id ->
             do_delete_vehicle(conn, vehicle)
 
           true ->
@@ -514,16 +518,19 @@ defmodule RideFastApiWeb.DriverController do
   end
 
   # PUT /api/v1/drivers/:id
-  def update(conn, %{"id" => id, "driver" => driver_params}) do
+  def update(conn, %{"id" => id} = params) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
+
     driver = Accounts.get_driver!(id)
 
     cond do
-      current.role == "admin" ->
-        do_update_driver(conn, driver, driver_params)
+      current_role == "admin" ->
+        do_update_driver(conn, driver, params)
 
-      current.id == driver.id ->
-        do_update_driver(conn, driver, driver_params)
+      current && current.id == driver.id ->
+        do_update_driver(conn, driver, params)
 
       true ->
         conn
@@ -532,8 +539,8 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
-  defp do_update_driver(conn, driver, driver_params) do
-    case Accounts.update_driver(driver, driver_params) do
+  defp do_update_driver(conn, driver, params) do
+    case Accounts.update_driver(driver, params) do
       {:ok, %Driver{} = driver} ->
         conn
         |> put_status(:ok)
@@ -549,8 +556,10 @@ defmodule RideFastApiWeb.DriverController do
   # DELETE /api/v1/drivers/:id (admin only, 204)
   def delete(conn, %{"id" => id}) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
 
-    if current.role != "admin" do
+    if current_role != "admin" do
       conn
       |> put_status(:forbidden)
       |> json(%{error: "Forbidden"})
@@ -569,42 +578,23 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
+  # POST /api/v1/drivers/:driver_id/languages/:language_id
   def add_language(conn, %{"driver_id" => driver_id_str, "language_id" => language_id_str}) do
     # converte ids
     with {driver_id, ""} <- Integer.parse(driver_id_str),
          {language_id, ""} <- Integer.parse(language_id_str) do
-      # use a chamada qualificada para evitar problemas de import/compilação
       current = Guardian.Plug.current_resource(conn)
+      claims = Guardian.Plug.current_claims(conn)
+      current_role = claims && claims["role"]
 
-      # verifica autorização: admin ou driver dono
       cond do
-        authorized_to_modify_driver?(current, driver_id) ->
-          case RideFastApi.Accounts.associate_driver_language(driver_id, language_id) do
-            {:ok, :created} ->
-              conn
-              |> put_status(:created)
-              |> json(%{driver_id: driver_id, language_id: language_id})
+        # Admin (via claims) pode tudo
+        current_role == "admin" ->
+          do_add_language(conn, driver_id, language_id)
 
-            {:error, :already_exists} ->
-              conn
-              |> put_status(:conflict)
-              |> json(%{error: "Association already exists"})
-
-            {:error, :not_found_driver} ->
-              conn
-              |> put_status(:not_found)
-              |> json(%{error: "Driver not found"})
-
-            {:error, :not_found_language} ->
-              conn
-              |> put_status(:not_found)
-              |> json(%{error: "Language not found"})
-
-            {:error, reason} ->
-              conn
-              |> put_status(:internal_server_error)
-              |> json(%{error: "Could not associate language", reason: inspect(reason)})
-          end
+        # Driver dono (via struct + id)
+        current && current.id == driver_id ->
+          do_add_language(conn, driver_id, language_id)
 
         true ->
           conn
@@ -619,22 +609,40 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
-  defp authorized_to_modify_driver?(nil, _driver_id), do: false
+  defp do_add_language(conn, driver_id, language_id) do
+    case RideFastApi.Accounts.associate_driver_language(driver_id, language_id) do
+      {:ok, :created} ->
+        conn
+        |> put_status(:created)
+        |> json(%{driver_id: driver_id, language_id: language_id})
 
-  # Admin pode tudo
-  defp authorized_to_modify_driver?(%{role: "admin"}, _driver_id), do: true
+      {:error, :already_exists} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "Association already exists"})
 
-  # Driver só pode modificar a si próprio
-  defp authorized_to_modify_driver?(%{role: "driver", id: id}, driver_id)
-       when is_integer(id) do
-    id == driver_id
+      {:error, :not_found_driver} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Driver not found"})
+
+      {:error, :not_found_language} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Language not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Could not associate language", reason: inspect(reason)})
+    end
   end
 
-  # Fallback
-  defp authorized_to_modify_driver?(_current, _driver_id), do: false
-
+  # remove_language com o mesmo padrão de claims
   def remove_language(conn, %{"driver_id" => driver_id_str, "language_id" => language_id_str}) do
     current = Guardian.Plug.current_resource(conn)
+    claims = Guardian.Plug.current_claims(conn)
+    current_role = claims && claims["role"]
 
     # valida ids
     with {driver_id, ""} <- Integer.parse(driver_id_str),
@@ -645,21 +653,16 @@ defmodule RideFastApiWeb.DriverController do
           |> put_status(:unauthorized)
           |> json(%{error: "Unauthorized"})
 
-        not authorized_to_modify_driver?(current, driver_id) ->
+        current_role == "admin" ->
+          do_remove_language(conn, driver_id, language_id)
+
+        current && current.id == driver_id ->
+          do_remove_language(conn, driver_id, language_id)
+
+        true ->
           conn
           |> put_status(:forbidden)
           |> json(%{error: "Forbidden"})
-
-        true ->
-          case RideFastApi.Accounts.remove_language_from_driver(driver_id, language_id) do
-            {:ok, :removed} ->
-              send_resp(conn, :no_content, "")
-
-            {:error, :not_found} ->
-              conn
-              |> put_status(:not_found)
-              |> json(%{error: "Association not found"})
-          end
       end
     else
       _ ->
@@ -669,9 +672,20 @@ defmodule RideFastApiWeb.DriverController do
     end
   end
 
-  # GET /api/v1/drivers/:driver_id/languages
+  defp do_remove_language(conn, driver_id, language_id) do
+    case RideFastApi.Accounts.remove_language_from_driver(driver_id, language_id) do
+      {:ok, :removed} ->
+        send_resp(conn, :no_content, "")
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Association not found"})
+    end
+  end
+
+  # GET /api/v1/drivers/:driver_id/languages permanece igual
   def list_languages(conn, %{"driver_id" => driver_id_str}) do
-    # permite id tanto string quanto int
     with {driver_id, ""} <- Integer.parse(driver_id_str) do
       case RideFastApi.Accounts.list_languages_for_driver(driver_id) do
         {:error, :not_found} ->
